@@ -1,9 +1,5 @@
 streamlit
 pyrebase4
-pandas
-numpy
 matplotlib
 seaborn
 setuptools
-time
-io
