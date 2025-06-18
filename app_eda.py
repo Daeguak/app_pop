@@ -271,12 +271,9 @@ class EDA:
             diff_df['Diff'] = diff_df.groupby('Region')['Population'].diff()
             # Select top 100 increases
             top100 = diff_df.nlargest(100, 'Diff')[['Year', 'Region', 'Diff']]
-            # Format and style table
-            styled = (
-                top100
-                .style
+            # Format and.style
                 .format({'Diff': '{:,.0f}'})  # thousand separators
-                .background_gradient(cmap='bwr', subset=['Diff'])  # red for negative, blue for positive
+                .background_gradient(cmap='bwr_r', subset=['Diff'])  # positive: blue, negative: red  # red for negative, blue for positive
             )
             st.dataframe(styled)
         # 5. Visualization
