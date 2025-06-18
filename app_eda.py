@@ -216,7 +216,7 @@ class EDA:
             st.write(f"Duplicates: {df.duplicated().sum()}")
             buf = io.StringIO(); df.info(buf=buf); st.text(buf.getvalue())
             st.dataframe(df.describe())
-        # 2. Yearly Trend with Forecast
+                # 2. Yearly Trend with Forecast
         with tabs[1]:
             st.header("Yearly Population Trend with 2035 Forecast")
             nation = df[df['Region']=='Nationwide']
@@ -232,13 +232,13 @@ class EDA:
             full = pd.concat([yearly, forecast], ignore_index=True)
             fig, ax = plt.subplots(figsize=(8,5))
             sns.lineplot(data=full, x='Year', y='Population', marker='o', ax=ax)
-            ax.axvline(2035, ls='--', color='gray')
+            # Plot marker at 2035 forecast
+            y2035 = full.loc[full['Year']==2035, 'Population'].values[0]
+            ax.scatter(2035, y2035, color='red', zorder=5)
+            ax.text(2035, y2035, f"{int(y2035):,}", va='bottom', ha='left')
             ax.set_title('Yearly Population Trend with 2035 Forecast')
             ax.set_xlabel('Year')
             ax.set_ylabel('Population')
-            ax.annotate('Forecast', xy=(2035, full.query('Year==2035')['Population'].values[0]),
-                        xytext=(last_year, full['Population'].max()*0.9),
-                        arrowprops=dict(arrowstyle='->'))
             st.pyplot(fig)
         # 3. Regional Analysis
         with tabs[2]:
