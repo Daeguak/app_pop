@@ -8,16 +8,16 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # ---------------------
-# Firebase settings
+# Firebase 설정
 # ---------------------
 firebase_config = {
-    "apiKey": "YOUR_API_KEY",
-    "authDomain": "YOUR_PROJECT.firebaseapp.com",
-    "databaseURL": "https://YOUR_PROJECT.firebaseio.com",
-    "projectId": "YOUR_PROJECT",
-    "storageBucket": "YOUR_PROJECT.appspot.com",
-    "messagingSenderId": "YOUR_SENDER_ID",
-    "appId": "YOUR_APP_ID"
+    "apiKey": "AIzaSyCswFmrOGU3FyLYxwbNPTp7hvQxLfTPIZw",
+    "authDomain": "sw-projects-49798.firebaseapp.com",
+    "databaseURL": "https://sw-projects-49798-default-rtdb.firebaseio.com",
+    "projectId": "sw-projects-49798",
+    "storageBucket": "sw-projects-49798.firebasestorage.app",
+    "messagingSenderId": "812186368395",
+    "appId": "1:812186368395:web:be2f7291ce54396209d78e"
 }
 
 firebase = pyrebase.initialize_app(firebase_config)
@@ -26,77 +26,76 @@ firestore = firebase.database()
 storage = firebase.storage()
 
 # ---------------------
-# Session state initialization
+# 세션 상태 초기화
 # ---------------------
-if 'logged_in' not in st.session_state:
+if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-    st.session_state.user_email = ''
-    st.session_state.id_token = ''
-    st.session_state.user_name = ''
-    st.session_state.user_gender = 'None'
-    st.session_state.user_phone = ''
-    st.session_state.profile_image_url = ''
+    st.session_state.user_email = ""
+    st.session_state.id_token = ""
+    st.session_state.user_name = ""
+    st.session_state.user_gender = "선택 안함"
+    st.session_state.user_phone = ""
+    st.session_state.profile_image_url = ""
 
 # ---------------------
-# Home Page
+# 홈 페이지 클래스
 # ---------------------
 class Home:
-    def __init__(self, login_page, register_page, reset_password_page):
-        st.title("🏠 Home - Regional Population Analysis")
-        if st.session_state.logged_in:
-            st.success(f"Welcome, {st.session_state.user_email}")
-        st.markdown(
-            """
-            **Dataset**: population_trends.csv  
-            - **Columns**: Year, Region, Population, Births, Deaths  
-            - **Description**: Annual population statistics by region
-            """
-        )
+    def __init__(self, login_page, register_page, findpw_page):
+        st.title("🏠 Home - 지역별 인구 분석")
+        if st.session_state.get("logged_in"):
+            st.success(f"{st.session_state.get('user_email')}님, 환영합니다.")
+        st.markdown("""
+        ---
+        **Dataset: population_trends.csv**  
+        - **Columns**: `Year`, `Region`, `Population`, `Births`, `Deaths`  
+        - **Description**: Annual population statistics by region
+        """)
 
 # ---------------------
-# Login Page
+# 로그인 페이지 클래스
 # ---------------------
 class Login:
     def __init__(self):
-        st.title("🔐 Login")
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        if st.button("Login"):
+        st.title("🔐 로그인")
+        email = st.text_input("이메일")
+        password = st.text_input("비밀번호", type="password")
+        if st.button("로그인"):
             try:
                 user = auth.sign_in_with_email_and_password(email, password)
                 st.session_state.logged_in = True
                 st.session_state.user_email = email
                 st.session_state.id_token = user['idToken']
 
-                user_data = firestore.child("users").child(email.replace('.', '_')).get().val()
-                if user_data:
-                    st.session_state.user_name = user_data.get('name', '')
-                    st.session_state.user_gender = user_data.get('gender', 'None')
-                    st.session_state.user_phone = user_data.get('phone', '')
-                    st.session_state.profile_image_url = user_data.get('profile_image_url', '')
+                user_info = firestore.child("users").child(email.replace(".", "_")).get().val()
+                if user_info:
+                    st.session_state.user_name = user_info.get("name", "")
+                    st.session_state.user_gender = user_info.get("gender", "선택 안함")
+                    st.session_state.user_phone = user_info.get("phone", "")
+                    st.session_state.profile_image_url = user_info.get("profile_image_url", "")
 
-                st.success("Login successful!")
+                st.success("로그인 성공!")
                 time.sleep(1)
                 st.rerun()
-            except Exception:
-                st.error("Login failed. Please check your credentials.")
+            except Exception as e:
+                st.error(f"로그인 실패: {e}")
 
 # ---------------------
-# Registration Page
+# 회원가입 페이지 클래스
 # ---------------------
 class Register:
     def __init__(self, login_page_url):
-        st.title("📝 Register")
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        name = st.text_input("Name")
-        gender = st.selectbox("Gender", ["None", "Male", "Female"])
-        phone = st.text_input("Phone Number")
+        st.title("📝 회원가입")
+        email = st.text_input("이메일")
+        password = st.text_input("비밀번호", type="password")
+        name = st.text_input("성명")
+        gender = st.selectbox("성별", ["선택 안함", "남성", "여성"])
+        phone = st.text_input("휴대전화번호")
 
-        if st.button("Sign Up"):
+        if st.button("회원가입"):
             try:
                 auth.create_user_with_email_and_password(email, password)
-                firestore.child("users").child(email.replace('.', '_')).set({
+                firestore.child("users").child(email.replace(".", "_")).set({
                     "email": email,
                     "name": name,
                     "gender": gender,
@@ -104,200 +103,158 @@ class Register:
                     "role": "user",
                     "profile_image_url": ""
                 })
-                st.success("Registration successful! Redirecting to login...")
+                st.success("회원가입 성공! 로그인 페이지로 이동합니다.")
                 time.sleep(1)
                 st.switch_page(login_page_url)
-            except Exception:
-                st.error("Registration failed. Please try again.")
+            except Exception as e:
+                st.error(f"회원가입 실패: {e}")
 
 # ---------------------
-# Password Reset Page
+# 비밀번호 찾기 페이지 클래스
 # ---------------------
-class ResetPassword:
+class FindPassword:
     def __init__(self):
-        st.title("🔎 Reset Password")
-        email = st.text_input("Email")
-        if st.button("Send Reset Email"):
+        st.title("🔎 비밀번호 찾기")
+        email = st.text_input("이메일")
+        if st.button("비밀번호 재설정 메일 전송"):
             try:
                 auth.send_password_reset_email(email)
-                st.success("Password reset email sent.")
+                st.success("비밀번호 재설정 이메일을 전송했습니다.")
                 time.sleep(1)
                 st.rerun()
-            except Exception:
-                st.error("Failed to send reset email. Please try again.")
+            except Exception as e:
+                st.error(f"이메일 전송 실패: {e}")
 
 # ---------------------
-# User Profile Page
+# 사용자 정보 수정 페이지 클래스
 # ---------------------
 class UserInfo:
     def __init__(self):
-        st.title("👤 My Profile")
-        email = st.session_state.user_email
-        new_email = st.text_input("Email", value=email)
-        name = st.text_input("Name", value=st.session_state.user_name)
+        st.title("👤 사용자 정보")
+
+        email = st.session_state.get("user_email", "")
+        new_email = st.text_input("이메일", value=email)
+        name = st.text_input("성명", value=st.session_state.get("user_name", ""))
         gender = st.selectbox(
-            "Gender",
-            ["None", "Male", "Female"],
-            index=["None", "Male", "Female"].index(st.session_state.user_gender)
+            "성별",
+            ["선택 안함", "남성", "여성"],
+            index=["선택 안함", "남성", "여성"].index(st.session_state.get("user_gender", "선택 안함"))
         )
-        phone = st.text_input("Phone Number", value=st.session_state.user_phone)
-        uploaded_file = st.file_uploader("Upload Profile Image", type=["jpg", "jpeg", "png"])
+        phone = st.text_input("휴대전화번호", value=st.session_state.get("user_phone", ""))
+
+        uploaded_file = st.file_uploader("프로필 이미지 업로드", type=["jpg", "jpeg", "png"])
         if uploaded_file:
-            path = f"profiles/{email.replace('.', '_')}.jpg"
-            storage.child(path).put(uploaded_file, st.session_state.id_token)
-            image_url = storage.child(path).get_url(st.session_state.id_token)
+            file_path = f"profiles/{email.replace('.', '_')}.jpg"
+            storage.child(file_path).put(uploaded_file, st.session_state.id_token)
+            image_url = storage.child(file_path).get_url(st.session_state.id_token)
             st.session_state.profile_image_url = image_url
             st.image(image_url, width=150)
-        elif st.session_state.profile_image_url:
+        elif st.session_state.get("profile_image_url"):
             st.image(st.session_state.profile_image_url, width=150)
 
-        if st.button("Save"):
+        if st.button("수정"):
             st.session_state.user_email = new_email
             st.session_state.user_name = name
             st.session_state.user_gender = gender
             st.session_state.user_phone = phone
-            firestore.child("users").child(new_email.replace('.', '_')).update({
+
+            firestore.child("users").child(new_email.replace(".", "_")).update({
                 "email": new_email,
                 "name": name,
                 "gender": gender,
                 "phone": phone,
-                "profile_image_url": st.session_state.profile_image_url
+                "profile_image_url": st.session_state.get("profile_image_url", "")
             })
-            st.success("Profile updated successfully.")
+
+            st.success("사용자 정보가 저장되었습니다.")
             time.sleep(1)
             st.rerun()
 
 # ---------------------
-# Logout Page
+# 로그아웃 페이지 클래스
 # ---------------------
 class Logout:
     def __init__(self):
-        for key in ['logged_in', 'user_email', 'id_token', 'user_name', 'user_gender', 'user_phone', 'profile_image_url']:
-            st.session_state[key] = False if key == 'logged_in' else ''
-        st.success("Logged out successfully.")
+        st.session_state.logged_in = False
+        st.session_state.user_email = ""
+        st.session_state.id_token = ""
+        st.session_state.user_name = ""
+        st.session_state.user_gender = "선택 안함"
+        st.session_state.user_phone = ""
+        st.session_state.profile_image_url = ""
+        st.success("로그아웃 되었습니다.")
         time.sleep(1)
         st.rerun()
 
 # ---------------------
-# EDA Page
+# EDA 페이지 클래스 수정
 # ---------------------
 class EDA:
     def __init__(self):
         st.title("📊 Regional Population Analysis EDA")
         uploaded = st.file_uploader("Upload population_trends.csv", type="csv")
         if not uploaded:
-            st.info("Please upload the population_trends.csv file.")
+            st.info("Please upload population_trends.csv file.")
             return
 
-        # Read CSV and normalize columns
         df = pd.read_csv(uploaded)
+        # Preprocessing column names and mapping
         df.columns = df.columns.str.strip()
-        # Translate Korean column names to English
-        mapping = {
-            '연도': 'Year',
-            '지역': 'Region',
-            '인구': 'Population',
-            '출생아수(명)': 'Births',
-            '사망자수(명)': 'Deaths'
-        }
-        df.rename(columns={k: v for k, v in mapping.items() if k in df.columns}, inplace=True)
-        # Convert numeric columns
-        for col in ['Population', 'Births', 'Deaths']:
+        mapping = {'연도':'Year','지역':'Region','인구':'Population','출생아수(명)':'Births','사망자수(명)':'Deaths'}
+        df.rename(columns={k:v for k,v in mapping.items() if k in df.columns}, inplace=True)
+        for col in ['Population','Births','Deaths']:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
-        # Translate region values
         if 'Region' in df.columns:
-            df['Region'] = df['Region'].replace({'전국': 'Nationwide'})
+            df['Region'] = df['Region'].replace({'전국':'Nationwide'})
 
         tabs = st.tabs([
-            "1. Basic Stats", "2. Nationwide Trend", "3. 5-Year Change",
-            "4. Top Changes", "5. Cumulative Area Chart"
+            "1. Basic Statistics","2. Nationwide Trend","3. 5-Year Change","4. Top Changes","5. Cumulative Area Chart"
         ])
-
-        # 1. Basic Stats
         with tabs[0]:
             st.header("🔍 Basic Statistics")
             st.write(df.isnull().sum())
             st.write(f"Duplicate rows: {df.duplicated().sum()}")
-            buf = io.StringIO()
-            df.info(buf=buf)
-            st.text(buf.getvalue())
-            st.dataframe(df.describe())
-            st.dataframe(df.head())
-
-        # 2. Nationwide Trend
+            buf=io.StringIO(); df.info(buf=buf); st.text(buf.getvalue())
+            st.dataframe(df.describe()); st.dataframe(df.head())
         with tabs[1]:
             st.header("📈 Yearly Population Trend (Nationwide)")
-            if 'Nationwide' in df['Region'].values:
-                trend = df[df['Region'] == 'Nationwide'].groupby('Year')['Population'].sum().\
-reset_index()
-            else:
-                trend = pd.DataFrame(columns=['Year', 'Population'])
-            fig, ax = plt.subplots()
-            sns.lineplot(x='Year', y='Population', data=trend, ax=ax)
-            ax.set_title('Yearly Population Trend (Nationwide)')
-            ax.set_xlabel('Year')
-            ax.set_ylabel('Population')
-            st.pyplot(fig)
-
-        # 3. 5-Year Change
+            total=df[df['Region']=='Nationwide'].groupby('Year')['Population'].sum().reset_index()
+            fig,ax=plt.subplots(); sns.lineplot(x='Year',y='Population',data=total,ax=ax)
+            ax.set_title('Yearly Population Trend (Nationwide)'); ax.set_xlabel('Year'); ax.set_ylabel('Population'); st.pyplot(fig)
         with tabs[2]:
-            st.header("📊 Population Change Over Last 5 Years")
-            if 'Year' in df.columns:
-                max_year = df['Year'].max()
-                recent = df[df['Year'].between(max_year-4, max_year) & (df['Region'] != 'Nationwide')]
-                pivot_df = recent.pivot(index='Region', columns='Year', values='Population')
-                pivot_df['Change'] = pivot_df[max_year] - pivot_df[max_year-4]
-                change_df = pivot_df['Change'].sort_values(ascending=False).reset_index()
-            else:
-                change_df = pd.DataFrame(columns=['Region', 'Change'])
-            fig, ax = plt.subplots()
-            sns.barplot(x='Change', y='Region', data=change_df, ax=ax)
-            ax.set_title('Population Change in Last 5 Years')
-            ax.set_xlabel('Change')
-            ax.set_ylabel('Region')
-            for i, v in enumerate(change_df['Change']):
-                ax.text(v, i, str(v))
-            st.pyplot(fig)
-
-        # 4. Top Changes
+            st.header("📊 Population Change in Last 5 Years")
+            last=df['Year'].max(); recent=df[df['Year'].between(last-4,last)&(df['Region']!='Nationwide')]
+            piv=recent.pivot(index='Region',columns='Year',values='Population'); piv['Change']=piv[last]-piv[last-4]
+            ch=piv['Change'].sort_values(ascending=False).reset_index(); fig,ax=plt.subplots();
+            sns.barplot(x='Change',y='Region',data=ch,ax=ax)
+            ax.set_title('Population Change in Last 5 Years'); ax.set_xlabel('Change'); ax.set_ylabel('Region')
+            for i,v in enumerate(ch['Change']): ax.text(v,i,str(v)); st.pyplot(fig)
         with tabs[3]:
             st.header("📋 Top Regions by Yearly Change")
-            diff_df = df[df['Region'] != 'Nationwide'].copy()
-            if 'Population' in diff_df.columns:
-                diff_df['Diff'] = diff_df.groupby('Region')['Population'].diff()
-                top100 = diff_df.nlargest(100, 'Diff')[['Year', 'Region', 'Diff']]
-            else:
-                top100 = pd.DataFrame(columns=['Year', 'Region', 'Diff'])
-            st.dataframe(top100.style.background_gradient(subset=['Diff'], cmap='Blues'))
-
-        # 5. Cumulative Area Chart
+            diff=df[df['Region']!='Nationwide'].copy(); diff['Diff']=diff.groupby('Region')['Population'].diff()
+            top=diff.nlargest(100,'Diff')[['Year','Region','Diff']]; st.dataframe(top.style.background_gradient(subset=['Diff'],cmap='Blues'))
         with tabs[4]:
             st.header("📊 Cumulative Area Chart")
-            df_cum = df[df['Region'] != 'Nationwide']
-            area_pivot = df_cum.pivot(index='Year', columns='Region', values='Population')
-            fig, ax = plt.subplots()
-            area_pivot.plot.area(ax=ax)
-            ax.set_title('Population by Region Over Years')
-            ax.set_xlabel('Year')
-            ax.set_ylabel('Population')
-            st.pyplot(fig)
+            cum=df[df['Region']!='Nationwide'].pivot(index='Year',columns='Region',values='Population')
+            fig,ax=plt.subplots(); cum.plot.area(ax=ax)
+            ax.set_title('Population by Region Over Years'); ax.set_xlabel('Year'); ax.set_ylabel('Population'); st.pyplot(fig)
 
 # ---------------------
-# Page Navigation
+# 페이지 객체 생성 및 네비게이션
 # ---------------------
 Page_Login    = st.Page(Login, title="Login", icon="🔐", url_path="login")
 Page_Register = st.Page(lambda: Register(Page_Login.url_path), title="Register", icon="📝", url_path="register")
-Page_Reset    = st.Page(ResetPassword, title="Reset Password", icon="🔎", url_path="reset-password")
-Page_Home     = st.Page(lambda: Home(Page_Login, Page_Register, Page_Reset), title="Home", icon="🏠", url_path="home", default=True)
+Page_FindPW   = st.Page(FindPassword, title="Find PW", icon="🔎", url_path="find-password")
+Page_Home     = st.Page(lambda: Home(Page_Login, Page_Register, Page_FindPW), title="Home", icon="🏠", url_path="home", default=True)
 Page_User     = st.Page(UserInfo, title="My Profile", icon="👤", url_path="user-info")
 Page_Logout   = st.Page(Logout, title="Logout", icon="🔓", url_path="logout")
 Page_EDA      = st.Page(EDA, title="EDA", icon="📊", url_path="eda")
 
 if st.session_state.logged_in:
-    pages = [Page_Home, Page_User, Page_Logout, Page_EDA]
+    pages=[Page_Home,Page_User,Page_Logout,Page_EDA]
 else:
-    pages = [Page_Home, Page_Login, Page_Register, Page_Reset]
+    pages=[Page_Home,Page_Login,Page_Register,Page_FindPW]
 
-selected_page = st.navigation(pages)
+selected_page=st.navigation(pages)
 selected_page.run()
