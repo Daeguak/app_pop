@@ -263,14 +263,20 @@ class EDA:
                 **Analysis:** The left chart shows absolute changes over the last five years in thousands,
                 highlighting which regions grew most in population. The right chart shows relative percent changes.
             """)
-        # 4. Change Analysis
+                # 4. Change Analysis
         with tabs[3]:
             st.header("Top 100 Yearly Population Changes")
+            # Calculate absolute yearly change per region
             diff_df = df[df['Region']!='Nationwide'].copy()
             diff_df['Diff'] = diff_df.groupby('Region')['Population'].diff()
-            top100 = diff_df.nlargest(100,'Diff')[['Year','Region','Diff']]
-            styled = (top100.style.format({'Diff':'{:,}'})
-                .background_gradient(cmap='bwr', subset=['Diff'])
+            # Select top 100 increases
+            top100 = diff_df.nlargest(100, 'Diff')[['Year', 'Region', 'Diff']]
+            # Format and style table
+            styled = (
+                top100
+                .style
+                .format({'Diff': '{:,.0f}'})  # thousand separators
+                .background_gradient(cmap='bwr', subset=['Diff'])  # red for negative, blue for positive
             )
             st.dataframe(styled)
         # 5. Visualization
