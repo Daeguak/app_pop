@@ -47,7 +47,7 @@ class Home:
             st.success(f"Welcome, {st.session_state.user_email}")
         st.markdown(
             """
-            **Dataset**: population_trends_english.csv  
+            **Dataset**: population_trends.csv  
             - **Columns**: Year, Region, Population, Births, Deaths  
             - **Description**: Annual population statistics by region
             """
@@ -189,9 +189,10 @@ class EDA:
             st.info("Please upload the population_trends.csv file.")
             return
 
-        # Read CSV
+        # Read CSV and normalize columns
         df = pd.read_csv(uploaded)
-        # Translate Korean columns to English if present
+        df.columns = df.columns.str.strip()
+        # Translate Korean column names to English
         mapping = {
             '연도': 'Year',
             '지역': 'Region',
@@ -199,16 +200,20 @@ class EDA:
             '출생아수(명)': 'Births',
             '사망자수(명)': 'Deaths'
         }
-        df.rename(columns={k:v for k,v in mapping.items() if k in df.columns}, inplace=True)
-        # Ensure numeric columns
+        df.rename(columns={k: v for k, v in mapping.items() if k in df.columns}, inplace=True)
+        # Convert numeric columns
         for col in ['Population', 'Births', 'Deaths']:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+        # Translate region values
+        if 'Region' in df.columns:
+            df['Region'] = df['Region'].replace({'전국': 'Nationwide'})
 
         tabs = st.tabs([
             "1. Basic Stats", "2. Nationwide Trend", "3. 5-Year Change",
             "4. Top Changes", "5. Cumulative Area Chart"
         ])
+
         # 1. Basic Stats
         with tabs[0]:
             st.header("🔍 Basic Statistics")
@@ -219,24 +224,33 @@ class EDA:
             st.text(buf.getvalue())
             st.dataframe(df.describe())
             st.dataframe(df.head())
+
         # 2. Nationwide Trend
         with tabs[1]:
             st.header("📈 Yearly Population Trend (Nationwide)")
-            trend = df[df['Region'] == 'Nationwide'].groupby('Year')['Population'].sum().reset_index()
+            if 'Nationwide' in df['Region'].values:
+                trend = df[df['Region'] == 'Nationwide'].groupby('Year')['Population'].sum().\
+reset_index()
+            else:
+                trend = pd.DataFrame(columns=['Year', 'Population'])
             fig, ax = plt.subplots()
             sns.lineplot(x='Year', y='Population', data=trend, ax=ax)
             ax.set_title('Yearly Population Trend (Nationwide)')
             ax.set_xlabel('Year')
             ax.set_ylabel('Population')
             st.pyplot(fig)
+
         # 3. 5-Year Change
         with tabs[2]:
             st.header("📊 Population Change Over Last 5 Years")
-            max_year = df['Year'].max()
-            recent = df[df['Year'].between(max_year-4, max_year) & (df['Region'] != 'Nationwide')]
-            pivot_df = recent.pivot(index='Region', columns='Year', values='Population')
-            pivot_df['Change'] = pivot_df[max_year] - pivot_df[max_year-4]
-            change_df = pivot_df['Change'].sort_values(ascending=False).reset_index()
+            if 'Year' in df.columns:
+                max_year = df['Year'].max()
+                recent = df[df['Year'].between(max_year-4, max_year) & (df['Region'] != 'Nationwide')]
+                pivot_df = recent.pivot(index='Region', columns='Year', values='Population')
+                pivot_df['Change'] = pivot_df[max_year] - pivot_df[max_year-4]
+                change_df = pivot_df['Change'].sort_values(ascending=False).reset_index()
+            else:
+                change_df = pd.DataFrame(columns=['Region', 'Change'])
             fig, ax = plt.subplots()
             sns.barplot(x='Change', y='Region', data=change_df, ax=ax)
             ax.set_title('Population Change in Last 5 Years')
@@ -245,13 +259,18 @@ class EDA:
             for i, v in enumerate(change_df['Change']):
                 ax.text(v, i, str(v))
             st.pyplot(fig)
+
         # 4. Top Changes
         with tabs[3]:
             st.header("📋 Top Regions by Yearly Change")
             diff_df = df[df['Region'] != 'Nationwide'].copy()
-            diff_df['Diff'] = diff_df.groupby('Region')['Population'].diff()
-            top100 = diff_df.nlargest(100, 'Diff')[['Year','Region','Diff']]
+            if 'Population' in diff_df.columns:
+                diff_df['Diff'] = diff_df.groupby('Region')['Population'].diff()
+                top100 = diff_df.nlargest(100, 'Diff')[['Year', 'Region', 'Diff']]
+            else:
+                top100 = pd.DataFrame(columns=['Year', 'Region', 'Diff'])
             st.dataframe(top100.style.background_gradient(subset=['Diff'], cmap='Blues'))
+
         # 5. Cumulative Area Chart
         with tabs[4]:
             st.header("📊 Cumulative Area Chart")
