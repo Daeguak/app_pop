@@ -19,7 +19,6 @@ firebase_config = {
     "messagingSenderId": "812186368395",
     "appId": "1:812186368395:web:be2f7291ce54396209d78e"
 }
-
 firebase = pyrebase.initialize_app(firebase_config)
 auth = firebase.auth()
 firestore = firebase.database()
@@ -125,7 +124,7 @@ class FindPassword:
                 st.error(f"이메일 전송 실패: {e}")
 
 # ---------------------
-# 사용자 정보 페이지 클래스
+# 사용자 정보 수정 페이지 클래스
 # ---------------------
 class UserInfo:
     def __init__(self):
@@ -185,82 +184,122 @@ class EDA:
         if not uploaded:
             st.info("Please upload population_trends.csv file.")
             return
+        # Load and preprocess
         df = pd.read_csv(uploaded)
+        # 1) Replace '-' with 0 for Sejong region
+        sejong_mask = df['지역'] == '세종'
+        for col in ['인구','출생아수(명)','사망자수(명)']:
+            df.loc[sejong_mask, col] = df.loc[sejong_mask, col].replace('-', 0)
+        # 2) Convert to numeric
+        for col in ['인구','출생아수(명)','사망자수(명)']:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+        # Column mapping and region translation
         df.columns = df.columns.str.strip()
         col_map = {'연도':'Year','지역':'Region','인구':'Population','출생아수(명)':'Births','사망자수(명)':'Deaths'}
         df.rename(columns={k:v for k,v in col_map.items() if k in df.columns}, inplace=True)
+        region_map = {'전국':'Nationwide','서울':'Seoul','부산':'Busan','대구':'Daegu','인천':'Incheon',
+                      '광주':'Gwangju','대전':'Daejeon','울산':'Ulsan','세종':'Sejong','경기':'Gyeonggi',
+                      '강원':'Gangwon','충북':'Chungbuk','충남':'Chungnam','전북':'Jeonbuk','전남':'Jeonnam',
+                      '경북':'Gyeongbuk','경남':'Gyeongnam','제주':'Jeju'}
+        df['Region'] = df['Region'].map(region_map).fillna(df['Region'])
+        # Ensure numeric columns
         for c in ['Population','Births','Deaths']:
             df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0).astype(int)
-        region_map = {
-            '전국':'Nationwide','서울':'Seoul','부산':'Busan','대구':'Daegu','인천':'Incheon',
-            '광주':'Gwangju','대전':'Daejeon','울산':'Ulsan','세종':'Sejong','경기':'Gyeonggi',
-            '강원':'Gangwon','충북':'Chungbuk','충남':'Chungnam','전북':'Jeonbuk','전남':'Jeonnam',
-            '경북':'Gyeongbuk','경남':'Gyeongnam','제주':'Jeju'
-        }
-        df['Region'] = df['Region'].map(region_map).fillna(df['Region'])
-        tabs = st.tabs(["1. Basic Statistics","2. Nationwide Trend","3. 5-Year Change","4. Top Changes","5. Cumulative Area Chart"])
+
+        # Tabs for EDA
+        tabs = st.tabs([
+            "Basic Statistics", "Yearly Trend", "Regional Analysis",
+            "Change Analysis", "Visualization"
+        ])
+        # 1. Basic Statistics
         with tabs[0]:
-            st.header("🔍 Basic Statistics")
+            st.header("Basic Statistics")
             st.write(df.isnull().sum())
             st.write(f"Duplicate rows: {df.duplicated().sum()}")
-            buffer = io.StringIO(); df.info(buf=buffer); st.text(buffer.getvalue())
-            st.dataframe(df.describe()); st.dataframe(df.head())
+            buf = io.StringIO(); df.info(buf=buf); st.text(buf.getvalue())
+            st.dataframe(df.describe())
+        # 2. Yearly Trend with forecast
         with tabs[1]:
-            st.header("📈 Yearly Population Trend (Nationwide)")
-            trend = df[df['Region']=='Nationwide'].groupby('Year')['Population'].sum().reset_index()
-            fig,ax = plt.subplots(); sns.lineplot(x='Year',y='Population',data=trend,ax=ax)
-            ax.set_title('Yearly Population Trend (Nationwide)'); ax.set_xlabel('Year'); ax.set_ylabel('Population'); st.pyplot(fig)
+            st.header("Yearly Population Trend with Forecast")
+            nation = df[df['Region']=='Nationwide']
+            trend = nation.groupby('Year')['Population'].sum().reset_index()
+            # Forecast to 2035 based on last 3 years net change
+            last3 = nation[nation['Year'] >= trend['Year'].max()-2]
+            avg_net = (last3['Births'].sum() - last3['Deaths'].sum()) / 3
+            latest_year = trend['Year'].max()
+            latest_pop = int(trend.loc[trend['Year']==latest_year, 'Population'])
+            future_years = list(range(latest_year+1, 2036))
+            future_pops = [latest_pop + avg_net*(yr-latest_year) for yr in future_years]
+            forecast_df = pd.DataFrame({'Year': future_years, 'Population': future_pops})
+            full_trend = pd.concat([trend, forecast_df], ignore_index=True)
+            fig, ax = plt.subplots()
+            sns.lineplot(x='Year', y='Population', data=full_trend, ax=ax)
+            ax.axvline(2035, ls='--')
+            ax.set_title('Yearly Population Trend with 2035 Forecast')
+            ax.set_xlabel('Year')
+            ax.set_ylabel('Population')
+            st.pyplot(fig)
+        # 3. Regional Analysis: last 5 years
         with tabs[2]:
-            st.header("📊 Population Change in Last 5 Years")
+            st.header("Population Change in Last 5 Years by Region")
             max_year = df['Year'].max()
-            recent = df[df['Year'].between(max_year-4, max_year) & (df['Region'] != 'Nationwide')]
+            recent = df[df['Year'].between(max_year-4, max_year) & (df['Region']!='Nationwide')]
             pivot = recent.pivot(index='Region', columns='Year', values='Population')
             pivot['Change'] = pivot[max_year] - pivot[max_year-4]
-            pivot['Percent Change'] = (pivot[max_year] - pivot[max_year-4]) / pivot[max_year-4] * 100
-
-            # 두 개의 그래프를 나란히 그리기
-            fig, axes = plt.subplots(ncols=2, figsize=(12, 6))
-            # 절대 변화량 바 차트
-            sns.barplot(x='Change', y='Region', data=pivot.reset_index().sort_values('Change', ascending=False), ax=axes[0])
-            axes[0].set_title('Population Change in Last 5 Years')
-            axes[0].set_xlabel('Absolute Change')
-            axes[0].set_ylabel('Region')
-
-            # 증감률 바 차트
-            sns.barplot(x='Percent Change', y='Region', data=pivot.reset_index().sort_values('Percent Change', ascending=False), ax=axes[1])
-            axes[1].set_title('Population Percent Change in Last 5 Years')
+            pivot['Percent Change'] = pivot['Change'] / pivot[max_year-4] * 100
+            pivot['Change_k'] = pivot['Change'] / 1000
+            fig, axes = plt.subplots(ncols=2, figsize=(12,6))
+            abs_df = pivot.reset_index().sort_values('Change_k', ascending=False)
+            sns.barplot(x='Change_k', y='Region', data=abs_df, ax=axes[0])
+            axes[0].set_title('Population Change (Thousands)')
+            axes[0].set_xlabel('Change (thousands)')
+            pct_df = pivot.reset_index().sort_values('Percent Change', ascending=False)
+            sns.barplot(x='Percent Change', y='Region', data=pct_df, ax=axes[1])
+            axes[1].set_title('Percent Change (%)')
             axes[1].set_xlabel('Percent Change (%)')
-            axes[1].set_ylabel('')
-
-            # 그래프 출력
             st.pyplot(fig)
-
+            st.markdown("""
+                **Analysis:** The left chart shows absolute changes over the last five years in thousands,
+                highlighting which regions grew most in population. The right chart shows relative percent changes.
+            """
+        # 4. Change Analysis: top 100 diffs
         with tabs[3]:
-            st.header("📋 Top Regions by Yearly Change")
-            diff_df = df[df['Region']!='Nationwide'].copy(); diff_df['Diff']=diff_df.groupby('Region')['Population'].diff()
+            st.header("Top 100 Yearly Population Changes")
+            diff_df = df[df['Region']!='Nationwide'].copy()
+            diff_df['Diff'] = diff_df.groupby('Region')['Population'].diff()
             top100 = diff_df.nlargest(100,'Diff')[['Year','Region','Diff']]
-            st.dataframe(top100.style.background_gradient(subset=['Diff'],cmap='Blues'))
+            styled = (top100
+                .style
+                .format({'Diff':'{:,}'})
+                .background_gradient(cmap='bwr', subset=['Diff'])
+            )
+            st.dataframe(styled)
+        # 5. Visualization: cumulative area chart
         with tabs[4]:
-            st.header("📊 Cumulative Area Chart")
-            area = df[df['Region']!='Nationwide'].pivot(index='Year',columns='Region',values='Population')
-            fig,ax=plt.subplots(); area.plot.area(ax=ax)
-            ax.set_title('Population by Region Over Years'); ax.set_xlabel('Year'); ax.set_ylabel('Population'); st.pyplot(fig)
+            st.header("Cumulative Area Chart by Region")
+            area_df = df[df['Region']!='Nationwide'].pivot(index='Year', columns='Region', values='Population')
+            colors = sns.color_palette('tab20', n_colors=area_df.shape[1])
+            fig, ax = plt.subplots(figsize=(10,6))
+            area_df.plot.area(ax=ax, color=colors)
+            ax.set_title('Population by Region Over Years')
+            ax.set_xlabel('Year')
+            ax.set_ylabel('Population')
+            ax.legend(title='Region', bbox_to_anchor=(1.05,1), loc='upper left')
+            st.pyplot(fig)
 
 # ---------------------
 # 페이지 객체 생성 및 네비게이션
 # ---------------------
-Page_Login    = st.Page(Login, title="Login", icon="🔐", url_path="login")
+Page_Login    = st.Page(Login,    title="Login",    icon="🔐", url_path="login")
 Page_Register = st.Page(lambda: Register(Page_Login.url_path), title="Register", icon="📝", url_path="register")
 Page_FindPW   = st.Page(FindPassword, title="Find PW", icon="🔎", url_path="find-password")
 Page_Home     = st.Page(lambda: Home(Page_Login, Page_Register, Page_FindPW), title="Home", icon="🏠", url_path="home", default=True)
 Page_User     = st.Page(UserInfo, title="My Profile", icon="👤", url_path="user-info")
-Page_Logout   = st.Page(Logout, title="Logout", icon="🔓", url_path="logout")
-Page_EDA      = st.Page(EDA, title="EDA", icon="📊", url_path="eda")
-
+Page_Logout   = st.Page(Logout,   title="Logout",  icon="🔓", url_path="logout")
+Page_EDA      = st.Page(EDA,      title="EDA",     icon="📊", url_path="eda")
 if st.session_state.logged_in:
     pages = [Page_Home, Page_User, Page_Logout, Page_EDA]
 else:
     pages = [Page_Home, Page_Login, Page_Register, Page_FindPW]
-
 selected_page = st.navigation(pages)
 selected_page.run()
