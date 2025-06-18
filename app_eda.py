@@ -206,7 +206,15 @@ class EDA:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
         if 'Region' in df.columns:
-            df['Region'] = df['Region'].replace({'전국':'Nationwide'})
+            # Map Korean region names to English equivalents
+            region_map = {
+                '전국':'Nationwide', '서울':'Seoul', '부산':'Busan', '대구':'Daegu',
+                '인천':'Incheon', '광주':'Gwangju', '대전':'Daejeon', '울산':'Ulsan',
+                '세종':'Sejong', '경기':'Gyeonggi', '강원':'Gangwon', '충북':'Chungbuk',
+                '충남':'Chungnam', '전북':'Jeonbuk', '전남':'Jeonnam', '경북':'Gyeongbuk',
+                '경남':'Gyeongnam', '제주':'Jeju'
+            }
+            df['Region'] = df['Region'].map(region_map).fillna(df['Region'])
 
         tabs = st.tabs([
             "1. Basic Statistics","2. Nationwide Trend","3. 5-Year Change","4. Top Changes","5. Cumulative Area Chart"
@@ -258,3 +266,4 @@ else:
 
 selected_page=st.navigation(pages)
 selected_page.run()
+ㅇ
