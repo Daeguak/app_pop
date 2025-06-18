@@ -261,7 +261,7 @@ class EDA:
             st.markdown("""
                 **Analysis:** The left chart shows absolute changes over the last five years in thousands,
                 highlighting which regions grew most in population. The right chart shows relative percent changes.
-            """
+                """)
         # 4. Change Analysis: top 100 diffs
         with tabs[3]:
             st.header("Top 100 Yearly Population Changes")
