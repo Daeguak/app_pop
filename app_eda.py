@@ -213,14 +213,28 @@ class EDA:
         with tabs[2]:
             st.header("📊 Population Change in Last 5 Years")
             max_year = df['Year'].max()
-            recent = df[df['Year'].between(max_year-4,max_year)&(df['Region']!='Nationwide')]
-            pivot = recent.pivot(index='Region',columns='Year',values='Population')
-            pivot['Change'] = pivot[max_year]-pivot[max_year-4]
-            change = pivot['Change'].sort_values(ascending=False).reset_index()
-            fig,ax=plt.subplots(); sns.barplot(x='Change',y='Region',data=change,ax=ax)
-            ax.set_title('Population Change in Last 5 Years'); ax.set_xlabel('Change'); ax.set_ylabel('Region')
-            for i,v in enumerate(change['Change']): ax.text(v,i,str(v))
+            recent = df[df['Year'].between(max_year-4, max_year) & (df['Region'] != 'Nationwide')]
+            pivot = recent.pivot(index='Region', columns='Year', values='Population')
+            pivot['Change'] = pivot[max_year] - pivot[max_year-4]
+            pivot['Percent Change'] = (pivot[max_year] - pivot[max_year-4]) / pivot[max_year-4] * 100
+
+            # 두 개의 그래프를 나란히 그리기
+            fig, axes = plt.subplots(ncols=2, figsize=(12, 6))
+            # 절대 변화량 바 차트
+            sns.barplot(x='Change', y='Region', data=pivot.reset_index().sort_values('Change', ascending=False), ax=axes[0])
+            axes[0].set_title('Population Change in Last 5 Years')
+            axes[0].set_xlabel('Absolute Change')
+            axes[0].set_ylabel('Region')
+
+            # 증감률 바 차트
+            sns.barplot(x='Percent Change', y='Region', data=pivot.reset_index().sort_values('Percent Change', ascending=False), ax=axes[1])
+            axes[1].set_title('Population Percent Change in Last 5 Years')
+            axes[1].set_xlabel('Percent Change (%)')
+            axes[1].set_ylabel('')
+
+            # 그래프 출력
             st.pyplot(fig)
+
         with tabs[3]:
             st.header("📋 Top Regions by Yearly Change")
             diff_df = df[df['Region']!='Nationwide'].copy(); diff_df['Diff']=diff_df.groupby('Region')['Population'].diff()
