@@ -266,4 +266,3 @@ else:
 
 selected_page=st.navigation(pages)
 selected_page.run()
-ㅇ
